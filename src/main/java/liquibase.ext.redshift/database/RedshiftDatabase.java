@@ -1,13 +1,22 @@
 package liquibase.ext.redshift.database;
 
+import liquibase.CatalogAndSchema;
+import liquibase.change.ColumnConfig;
+import liquibase.change.core.CreateTableChange;
+import liquibase.database.Database;
 import liquibase.database.DatabaseConnection;
 import liquibase.database.core.PostgresDatabase;
 import liquibase.exception.DatabaseException;
+import liquibase.exception.UnexpectedLiquibaseException;
+import liquibase.snapshot.InvalidExampleException;
+import liquibase.snapshot.SnapshotControl;
+import liquibase.snapshot.SnapshotGeneratorFactory;
+import liquibase.statement.SqlStatement;
+import liquibase.statement.core.*;
+import liquibase.structure.core.*;
 import liquibase.util.StringUtils;
 
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.*;
 
 public class RedshiftDatabase extends PostgresDatabase {
 
@@ -193,5 +202,105 @@ public class RedshiftDatabase extends PostgresDatabase {
     @Override
     public String getCurrentDateTimeFunction() {
         return "GETDATE()";
+    }
+
+    /*  Based on liquibase.database.core.SQLiteDatabase alter table pattern.
+        Thankfully SQLite ALTER TABLE is/was limited in ways similar to
+        redshift so a lot of existing code related to it can be leveraged
+        for our purposes.
+
+        Leveraged:
+            AlterTableVisitor
+            getAlterTableStatements
+
+        See http://www.sqlite.org/lang_altertable.html for more info. */
+    public interface AlterTableVisitor {
+        public ColumnConfig[] getColumnsToAdd();
+
+        public boolean copyThisColumn(ColumnConfig column);
+
+        public boolean createThisColumn(ColumnConfig column);
+
+        public boolean createThisIndex(Index index);
+    }
+
+    public static List<SqlStatement> getAlterTableStatements(
+            AlterTableVisitor alterTableVisitor,
+            Database database, String catalogName, String schemaName, String tableName)
+            throws DatabaseException {
+
+        List<SqlStatement> statements = new ArrayList<SqlStatement>();
+
+        Table table;
+        try {
+            table = SnapshotGeneratorFactory.getInstance().createSnapshot((Table) new Table().setName(tableName).setSchema(new Schema(new Catalog(null), null)), database);
+
+            List<ColumnConfig> createColumns = new ArrayList<ColumnConfig>();
+            List<ColumnConfig> copyColumns = new ArrayList<ColumnConfig>();
+            if (table != null) {
+                for (Column column : table.getColumns()) {
+                    ColumnConfig new_column = new ColumnConfig(column);
+                    if (alterTableVisitor.createThisColumn(new_column)) {
+                        createColumns.add(new_column);
+                    }
+                    ColumnConfig copy_column = new ColumnConfig(column);
+                    if (alterTableVisitor.copyThisColumn(copy_column)) {
+                        copyColumns.add(copy_column);
+                    }
+
+                }
+            }
+            for (ColumnConfig column : alterTableVisitor.getColumnsToAdd()) {
+                if (alterTableVisitor.createThisColumn(column)) {
+                    createColumns.add(column);
+                }
+                if (alterTableVisitor.copyThisColumn(column)) {
+                    copyColumns.add(column);
+                }
+            }
+
+            List<Index> newIndices = new ArrayList<Index>();
+            for (Index index : SnapshotGeneratorFactory.getInstance().createSnapshot(new CatalogAndSchema(catalogName, schemaName), database, new SnapshotControl(database, Index.class)).get(Index.class)) {
+                if (index.getTable().getName().equalsIgnoreCase(tableName)) {
+                    if (alterTableVisitor.createThisIndex(index)) {
+                        newIndices.add(index);
+                    }
+                }
+            }
+
+            // rename table
+            String temp_table_name = tableName + "_temporary";
+
+            statements.addAll(Arrays.asList(new RenameTableStatement(catalogName, schemaName, tableName, temp_table_name)));
+            // create temporary table
+            CreateTableChange ct_change_tmp = new CreateTableChange();
+            ct_change_tmp.setSchemaName(schemaName);
+            ct_change_tmp.setTableName(tableName);
+            for (ColumnConfig column : createColumns) {
+                ct_change_tmp.addColumn(column);
+            }
+            statements.addAll(Arrays.asList(ct_change_tmp.generateStatements(database)));
+            // copy rows to temporary table
+            statements.addAll(Arrays.asList(new CopyRowsStatement(temp_table_name, tableName, copyColumns)));
+            // delete original table
+            statements.addAll(Arrays.asList(new DropTableStatement(catalogName, schemaName, temp_table_name, false)));
+            // validate indices
+            statements.addAll(Arrays.asList(new ReindexStatement(catalogName, schemaName, tableName)));
+            // add remaining indices
+            for (Index index_config : newIndices) {
+                statements.addAll(Arrays.asList(new CreateIndexStatement(
+                        index_config.getName(),
+                        catalogName, schemaName, tableName,
+                        index_config.isUnique(),
+                        index_config.getAssociatedWithAsString(),
+                        index_config.getColumns().
+                                toArray(new String[index_config.getColumns().size()]))));
+            }
+
+            return statements;
+        } catch (InvalidExampleException e) {
+            throw new UnexpectedLiquibaseException(e);
+        }
+
     }
 }
