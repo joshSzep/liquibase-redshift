@@ -9,8 +9,6 @@ import liquibase.database.core.PostgresDatabase;
 import liquibase.exception.DatabaseException;
 import liquibase.exception.UnexpectedLiquibaseException;
 import liquibase.ext.redshift.datatype.DateTimeTypeRedshift;
-import liquibase.ext.redshift.datatype.DoubleTypeRedshift;
-import liquibase.ext.redshift.datatype.FloatTypeRedshift;
 import liquibase.ext.redshift.datatype.TimestampTypeRedshift;
 import liquibase.ext.redshift.sqlgenerator.CopyRowsGeneratorRedshift;
 import liquibase.ext.redshift.sqlgenerator.DropDefaultValueGenerator;
@@ -39,8 +37,6 @@ public class RedshiftDatabase extends PostgresDatabase {
         liquibase.sqlgenerator.SqlGeneratorFactory.getInstance().register(new ReindexGeneratorRedshift());
 
         liquibase.datatype.DataTypeFactory.getInstance().register(DateTimeTypeRedshift.class);
-        liquibase.datatype.DataTypeFactory.getInstance().register(DoubleTypeRedshift.class);
-        liquibase.datatype.DataTypeFactory.getInstance().register(FloatTypeRedshift.class);
         liquibase.datatype.DataTypeFactory.getInstance().register(TimestampTypeRedshift.class);
 
         redshiftReservedWords.addAll(Arrays.asList("AES128",
