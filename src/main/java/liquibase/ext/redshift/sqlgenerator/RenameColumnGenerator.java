@@ -15,7 +15,7 @@ public class RenameColumnGenerator extends
 
 	@Override
 	public int getPriority() {
-		return 15;
+		return PRIORITY_DATABASE;
 	}
 
 	public boolean supports(RenameColumnStatement statement, Database database) {

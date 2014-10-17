@@ -8,6 +8,14 @@ import liquibase.database.DatabaseConnection;
 import liquibase.database.core.PostgresDatabase;
 import liquibase.exception.DatabaseException;
 import liquibase.exception.UnexpectedLiquibaseException;
+import liquibase.ext.redshift.datatype.DateTimeTypeRedshift;
+import liquibase.ext.redshift.datatype.DoubleTypeRedshift;
+import liquibase.ext.redshift.datatype.FloatTypeRedshift;
+import liquibase.ext.redshift.datatype.TimestampTypeRedshift;
+import liquibase.ext.redshift.sqlgenerator.CopyRowsGeneratorRedshift;
+import liquibase.ext.redshift.sqlgenerator.DropDefaultValueGenerator;
+import liquibase.ext.redshift.sqlgenerator.RenameColumnGenerator;
+import liquibase.ext.redshift.sqlgenerator.ReindexGeneratorRedshift;
 import liquibase.snapshot.InvalidExampleException;
 import liquibase.snapshot.SnapshotControl;
 import liquibase.snapshot.SnapshotGeneratorFactory;
@@ -24,6 +32,16 @@ public class RedshiftDatabase extends PostgresDatabase {
 
     public RedshiftDatabase() {
         super.setCurrentDateTimeFunction("GETDATE()");
+
+        liquibase.sqlgenerator.SqlGeneratorFactory.getInstance().register(new CopyRowsGeneratorRedshift());
+        liquibase.sqlgenerator.SqlGeneratorFactory.getInstance().register(new DropDefaultValueGenerator());
+        liquibase.sqlgenerator.SqlGeneratorFactory.getInstance().register(new RenameColumnGenerator());
+        liquibase.sqlgenerator.SqlGeneratorFactory.getInstance().register(new ReindexGeneratorRedshift());
+
+        liquibase.datatype.DataTypeFactory.getInstance().register(DateTimeTypeRedshift.class);
+        liquibase.datatype.DataTypeFactory.getInstance().register(DoubleTypeRedshift.class);
+        liquibase.datatype.DataTypeFactory.getInstance().register(FloatTypeRedshift.class);
+        liquibase.datatype.DataTypeFactory.getInstance().register(TimestampTypeRedshift.class);
 
         redshiftReservedWords.addAll(Arrays.asList("AES128",
                 "AES256",
@@ -247,7 +265,6 @@ public class RedshiftDatabase extends PostgresDatabase {
                     if (alterTableVisitor.copyThisColumn(copy_column)) {
                         copyColumns.add(copy_column);
                     }
-
                 }
             }
             for (ColumnConfig column : alterTableVisitor.getColumnsToAdd()) {
@@ -269,7 +286,7 @@ public class RedshiftDatabase extends PostgresDatabase {
             }
 
             // rename table
-            String temp_table_name = tableName + "_temporary";
+            String temp_table_name = tableName + "_temporary_" + Long.toString(System.currentTimeMillis() / 1000L);
 
             statements.addAll(Arrays.asList(new RenameTableStatement(catalogName, schemaName, tableName, temp_table_name)));
             // create temporary table
@@ -282,8 +299,10 @@ public class RedshiftDatabase extends PostgresDatabase {
             statements.addAll(Arrays.asList(ct_change_tmp.generateStatements(database)));
             // copy rows to temporary table
             statements.addAll(Arrays.asList(new CopyRowsStatement(temp_table_name, tableName, copyColumns)));
-            // delete original table
-            statements.addAll(Arrays.asList(new DropTableStatement(catalogName, schemaName, temp_table_name, false)));
+            /* joshszep - Disable deleting the 'original table' for now - we want to keep it around so that if this screws up we can unhose ourselves easier.
+                // delete original table
+                statements.addAll(Arrays.asList(new DropTableStatement(catalogName, schemaName, temp_table_name, false)));
+            */
             // validate indices
             statements.addAll(Arrays.asList(new ReindexStatement(catalogName, schemaName, tableName)));
             // add remaining indices

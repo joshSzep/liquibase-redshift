@@ -3,6 +3,7 @@ package liquibase.ext.redshift.change;
 import liquibase.change.ColumnConfig;
 import liquibase.change.DatabaseChange;
 import liquibase.database.Database;
+import liquibase.exception.ValidationErrors;
 import liquibase.ext.redshift.database.RedshiftDatabase;
 import liquibase.statement.SqlStatement;
 import liquibase.structure.core.Index;
@@ -21,6 +22,11 @@ public class DropDefaultValueChange
     @Override
     public boolean supports(Database database) {
         return database instanceof RedshiftDatabase;
+    }
+
+    @Override
+    public ValidationErrors validate(Database database) {
+        return super.validate(database);
     }
 
     @Override
@@ -43,7 +49,7 @@ public class DropDefaultValueChange
                 return true;
             }
             public boolean createThisColumn(ColumnConfig column) {
-                if (column.getName().equals(getColumnName())) {
+                if (column.getName().toLowerCase().equals(getColumnName().toLowerCase())) {
                     column.setDefaultValue(null);
                     column.setDefaultValueBoolean((Boolean) null);
                     column.setDefaultValueDate((Date) null);

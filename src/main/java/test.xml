@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.3.xsd">
+    <changeSet author="joshszep" id="1">
+        <dropDefaultValue tableName="joshszeptest" columnName="SMALLINT_drop" />
+        <dropDefaultValue tableName="joshszeptest" columnName="INTEGER_drop" />
+        <dropDefaultValue tableName="joshszeptest" columnName="BIGINT_drop" />
+        <dropDefaultValue tableName="joshszeptest" columnName="DECIMAL_drop" />
+        <dropDefaultValue tableName="joshszeptest" columnName="REAL_drop" />
+        <dropDefaultValue tableName="joshszeptest" columnName="DOUBLE_drop" />
+        <dropDefaultValue tableName="joshszeptest" columnName="BOOLEAN_drop" />
+        <dropDefaultValue tableName="joshszeptest" columnName="CHAR_drop" />
+        <dropDefaultValue tableName="joshszeptest" columnName="VARCHAR_drop" />
+        <dropDefaultValue tableName="joshszeptest" columnName="DATE_drop" />
+        <dropDefaultValue tableName="joshszeptest" columnName="TIMESTAMP_drop" />
+    </changeSet>
+</databaseChangeLog>
